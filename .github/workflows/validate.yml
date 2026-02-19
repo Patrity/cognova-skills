@@ -188,18 +188,8 @@ jobs:
               echo "," >> registry.json.tmp
             fi
 
-            cat >> registry.json.tmp << ENTRY
-  {
-    "name": "$name",
-    "description": "$description",
-    "version": "$version",
-    "author": "$author",
-    "tags": $tags,
-    "requiresSecrets": $secrets,
-    "files": [$files],
-    "updatedAt": "$updated"
-  }
-          ENTRY
+            printf '  {\n    "name": "%s",\n    "description": "%s",\n    "version": "%s",\n    "author": "%s",\n    "tags": %s,\n    "requiresSecrets": %s,\n    "files": [%s],\n    "updatedAt": "%s"\n  }\n' \
+              "$name" "$description" "$version" "$author" "$tags" "$secrets" "$files" "$updated" >> registry.json.tmp
           done
 
           echo "" >> registry.json.tmp
