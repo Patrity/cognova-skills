@@ -14,9 +14,9 @@ Or manually copy a skill directory to `~/.claude/skills/`.
 
 ## Available Skills
 
-| Skill | Description | Secrets Required |
-|-------|-------------|-----------------|
-| [system-info](./system-info/) | Gather system information (OS, CPU, memory, disk, network) | None |
+| Skill | Description | Tags | Secrets Required |
+|-------|-------------|------|-----------------|
+| [system-info](./system-info/) | Gather system information (OS, CPU, memory, disk, network) | official, diagnostics | None |
 
 ## Contributing
 

@@ -25,6 +25,7 @@ metadata:
   version: "1.0.0"
   requires-secrets: []
   author: "your-github-username"
+  tags: [community, automation]
   repository: "https://github.com/Patrity/cognova-skills"
   installed-from: "cognova-skills"
 ---
@@ -39,6 +40,18 @@ metadata:
 | `allowed-tools` | Claude Code tools the skill needs |
 | `metadata.version` | Semver version string |
 | `metadata.author` | Your GitHub username |
+| `metadata.tags` | Array of tags (see Tags below) |
+
+### Tags
+
+Every skill must have a `tags` array in metadata with **1 to 5 tags**:
+
+- The **first tag** must be `community` or `official`
+- Up to **4 additional** free-form tags for categorization
+
+Examples: `[community, discord, webhooks]`, `[community, automation]`, `[official, diagnostics]`
+
+CI will reject skills with more than 5 tags or without `community`/`official` as the first tag.
 
 ### Optional Fields
 

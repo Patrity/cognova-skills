@@ -4,6 +4,7 @@
     "description": "Gather system information including OS, CPU, memory, disk usage, and network details. Useful for diagnostics and environment checks.",
     "version": "1.0.0",
     "author": "Patrity",
+    "tags": ["official", "diagnostics"],
     "requiresSecrets": [],
     "files": ["SKILL.md", "system-info.py"],
     "updatedAt": "2026-02-17T00:00:00Z"

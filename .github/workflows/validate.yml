@@ -50,6 +50,30 @@ jobs:
               echo "  ERROR: name '$fm_name' doesn't match directory '$dir_name'"
               errors=$((errors + 1))
             fi
+
+            # Validate tags
+            tags_line=$(echo "$frontmatter" | grep "tags:" | head -1)
+            if [ -n "$tags_line" ]; then
+              # Extract tags array content from [tag1, tag2, ...]
+              tags_content=$(echo "$tags_line" | sed 's/.*tags: *\[//;s/\]//')
+              tag_count=$(echo "$tags_content" | tr ',' '\n' | sed 's/^ *//;s/ *$//' | grep -c '.')
+
+              # Max 5 tags
+              if [ "$tag_count" -gt 5 ]; then
+                echo "  ERROR: Too many tags ($tag_count). Maximum is 5."
+                errors=$((errors + 1))
+              fi
+
+              # First tag must be 'community' or 'official'
+              first_tag=$(echo "$tags_content" | tr ',' '\n' | sed 's/^ *//;s/ *$//' | head -1)
+              if [ "$first_tag" != "community" ] && [ "$first_tag" != "official" ]; then
+                echo "  ERROR: First tag must be 'community' or 'official', got '$first_tag'"
+                errors=$((errors + 1))
+              fi
+            else
+              echo "  ERROR: Missing required field 'tags' in metadata"
+              errors=$((errors + 1))
+            fi
           done
 
           if [ $errors -gt 0 ]; then
@@ -119,6 +143,24 @@ jobs:
             version=$(echo "$frontmatter" | grep "version:" | head -1 | sed 's/.*version: *"\?\([^"]*\)"\?/\1/')
             author=$(echo "$frontmatter" | grep "author:" | head -1 | sed 's/.*author: *"\?\([^"]*\)"\?/\1/')
 
+            # Get tags array
+            tags="[]"
+            tags_line=$(echo "$frontmatter" | grep "tags:" | head -1)
+            if echo "$tags_line" | grep -q '\['; then
+              raw_tags=$(echo "$tags_line" | sed 's/.*tags: *\[//;s/\]//')
+              tags="["
+              tag_first=true
+              for tag in $(echo "$raw_tags" | tr ',' '\n' | sed 's/^ *//;s/ *$//'); do
+                if [ "$tag_first" = true ]; then
+                  tag_first=false
+                else
+                  tags="$tags, "
+                fi
+                tags="$tags\"$tag\""
+              done
+              tags="$tags]"
+            fi
+
             # Get file list
             files=""
             for f in "$dir"*; do
@@ -152,6 +194,7 @@ jobs:
     "description": "$description",
     "version": "$version",
     "author": "$author",
+    "tags": $tags,
     "requiresSecrets": $secrets,
     "files": [$files],
     "updatedAt": "$updated"

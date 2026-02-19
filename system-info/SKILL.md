@@ -6,6 +6,7 @@ metadata:
   version: "1.0.0"
   requires-secrets: []
   author: Patrity
+  tags: [official, diagnostics]
   repository: "https://github.com/Patrity/cognova-skills"
   installed-from: "cognova-skills"
 ---
