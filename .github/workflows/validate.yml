@@ -1,0 +1,177 @@
+name: Validate Skills
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate SKILL.md files
+        run: |
+          errors=0
+
+          for dir in */; do
+            dir_name="${dir%/}"
+
+            # Skip hidden dirs and non-skill dirs
+            [[ "$dir_name" == .* ]] && continue
+            [ ! -f "$dir/SKILL.md" ] && continue
+
+            echo "Checking $dir_name..."
+
+            # Check required frontmatter fields
+            skill_md="$dir/SKILL.md"
+
+            if ! head -1 "$skill_md" | grep -q "^---"; then
+              echo "  ERROR: $skill_md missing frontmatter"
+              errors=$((errors + 1))
+              continue
+            fi
+
+            # Extract frontmatter
+            frontmatter=$(sed -n '/^---$/,/^---$/p' "$skill_md" | sed '1d;$d')
+
+            for field in name description; do
+              if ! echo "$frontmatter" | grep -q "^${field}:"; then
+                echo "  ERROR: Missing required field '$field'"
+                errors=$((errors + 1))
+              fi
+            done
+
+            # Check name matches directory
+            fm_name=$(echo "$frontmatter" | grep "^name:" | sed 's/name: *//')
+            if [ "$fm_name" != "$dir_name" ]; then
+              echo "  ERROR: name '$fm_name' doesn't match directory '$dir_name'"
+              errors=$((errors + 1))
+            fi
+          done
+
+          if [ $errors -gt 0 ]; then
+            echo ""
+            echo "$errors error(s) found"
+            exit 1
+          fi
+
+          echo "All skills valid!"
+
+      - name: Scan for hardcoded secrets
+        run: |
+          errors=0
+          # Common secret patterns
+          patterns=(
+            'sk-[a-zA-Z0-9]{20,}'
+            'ghp_[a-zA-Z0-9]{36}'
+            'AKIA[0-9A-Z]{16}'
+            'xox[baprs]-[0-9a-zA-Z]{10,}'
+          )
+
+          for dir in */; do
+            [[ "${dir%/}" == .* ]] && continue
+            [ ! -f "$dir/SKILL.md" ] && continue
+
+            for file in "$dir"*.py "$dir"*.md; do
+              [ ! -f "$file" ] && continue
+              for pattern in "${patterns[@]}"; do
+                if grep -qE "$pattern" "$file"; then
+                  echo "ERROR: Possible secret found in $file"
+                  errors=$((errors + 1))
+                fi
+              done
+            done
+          done
+
+          if [ $errors -gt 0 ]; then
+            exit 1
+          fi
+
+          echo "No secrets detected"
+
+  update-registry:
+    needs: validate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate registry.json
+        run: |
+          echo "[" > registry.json.tmp
+          first=true
+
+          for dir in */; do
+            dir_name="${dir%/}"
+            [[ "$dir_name" == .* ]] && continue
+            [ ! -f "$dir/SKILL.md" ] && continue
+
+            skill_md="$dir/SKILL.md"
+            frontmatter=$(sed -n '/^---$/,/^---$/p' "$skill_md" | sed '1d;$d')
+
+            name=$(echo "$frontmatter" | grep "^name:" | sed 's/name: *//')
+            description=$(echo "$frontmatter" | grep "^description:" | sed 's/description: *//')
+            version=$(echo "$frontmatter" | grep "version:" | head -1 | sed 's/.*version: *"\?\([^"]*\)"\?/\1/')
+            author=$(echo "$frontmatter" | grep "author:" | head -1 | sed 's/.*author: *"\?\([^"]*\)"\?/\1/')
+
+            # Get file list
+            files=""
+            for f in "$dir"*; do
+              [ ! -f "$f" ] && continue
+              fname=$(basename "$f")
+              if [ -z "$files" ]; then
+                files="\"$fname\""
+              else
+                files="$files, \"$fname\""
+              fi
+            done
+
+            # Get requires-secrets
+            secrets="[]"
+            secrets_line=$(echo "$frontmatter" | grep "requires-secrets:" | head -1)
+            if echo "$secrets_line" | grep -q '\['; then
+              secrets=$(echo "$secrets_line" | sed 's/.*requires-secrets: *//')
+            fi
+
+            updated=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+            if [ "$first" = true ]; then
+              first=false
+            else
+              echo "," >> registry.json.tmp
+            fi
+
+            cat >> registry.json.tmp << ENTRY
+  {
+    "name": "$name",
+    "description": "$description",
+    "version": "$version",
+    "author": "$author",
+    "requiresSecrets": $secrets,
+    "files": [$files],
+    "updatedAt": "$updated"
+  }
+          ENTRY
+          done
+
+          echo "" >> registry.json.tmp
+          echo "]" >> registry.json.tmp
+
+          mv registry.json.tmp registry.json
+
+      - name: Commit registry.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add registry.json
+          if git diff --staged --quiet; then
+            echo "No changes to registry.json"
+          else
+            git commit -m "chore: update registry.json"
+            git push
+          fi
